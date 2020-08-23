@@ -1,4 +1,5 @@
-package gae
+package main
+//package gae
 
 import (
 	"bufio"
@@ -21,8 +22,17 @@ import (
 	"strings"
 	"time"
 
-	"appengine"
-	"appengine/urlfetch"
+	"log"
+	"os"
+	"context"
+
+	//OldApp "appengine"
+	//OldUrl "appengine/urlfetch"
+	"google.golang.org/appengine"
+	alog "google.golang.org/appengine/log"
+	"google.golang.org/appengine/urlfetch"
+	//"appengine"
+	//"appengine/urlfetch"
 )
 
 const (
@@ -131,7 +141,7 @@ func ReadRequest(r io.Reader) (req *http.Request, err error) {
 	return
 }
 
-func fmtError(c appengine.Context, err error) string {
+func fmtError(c context.Context, err error) string {
 	return fmt.Sprintf(`{
     "type": "appengine(%s, %s/%s)",
     "host": "%s",
@@ -141,7 +151,7 @@ func fmtError(c appengine.Context, err error) string {
 `, runtime.Version(), runtime.GOOS, runtime.GOARCH, appengine.DefaultVersionHostname(c), appengine.ServerSoftware(), err.Error())
 }
 
-func handlerError(c appengine.Context, rw http.ResponseWriter, err error, code int) {
+func handlerError(c context.Context, rw http.ResponseWriter, err error, code int) {
 	var b bytes.Buffer
 	w, _ := flate.NewWriter(&b, flate.BestCompression)
 
@@ -165,18 +175,23 @@ func handlerError(c appengine.Context, rw http.ResponseWriter, err error, code i
 
 func handler(rw http.ResponseWriter, r *http.Request) {
 	var err error
-	c := appengine.NewContext(r)
+	//c := appengine.NewContext(r)
+	c := r.Context()
 
 	var hdrLen uint16
 	if err := binary.Read(r.Body, binary.BigEndian, &hdrLen); err != nil {
-		c.Criticalf("binary.Read(&hdrLen) return %v", err)
+		//c.Criticalf("binary.Read(&hdrLen) return %v", err)
+		alog.Criticalf(c,"binary.Read(&hdrLen) return %v", err)
+		//fmt.Fprintf(rw,"binary.Read(&hdrLen) return %v", err)
 		handlerError(c, rw, err, http.StatusBadRequest)
 		return
 	}
 
 	req, err := ReadRequest(bufio.NewReader(flate.NewReader(&io.LimitedReader{R: r.Body, N: int64(hdrLen)})))
 	if err != nil {
-		c.Criticalf("http.ReadRequest(%#v) return %#v", r.Body, err)
+		//c.Criticalf("http.ReadRequest(%#v) return %#v", r.Body, err)
+		alog.Criticalf(c,"http.ReadRequest(%#v) return %#v", r.Body, err)
+		//fmt.Fprintf(rw,"http.ReadRequest(%#v) return %#v", r.Body, err)
 		handlerError(c, rw, err, http.StatusBadRequest)
 		return
 	}
@@ -209,7 +224,9 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if debug > 1 {
-		c.Infof("Parsed Request=%#v\n", req)
+		//c.Infof("Parsed Request=%#v\n", req)
+		alog.Infof(c,"Parsed Request=%#v\n", req)
+		//fmt.Fprintf(rw,"Parsed Request=%#v\n", req)
 	}
 
 	if Password != "" {
@@ -243,9 +260,10 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	for i := 0; i < 2; i++ {
 		t := &urlfetch.Transport{
 			Context:                       c,
-			Deadline:                      deadline,
+			//Deadline:                      deadline,
 			AllowInvalidServerCertificate: !sslVerify,
 		}
+		//var t http.Transport; //???
 
 		resp, err = t.RoundTrip(req)
 		if resp != nil && resp.Body != nil {
@@ -264,7 +282,9 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 
 		message := err.Error()
 		if strings.Contains(message, "RESPONSE_TOO_LARGE") {
-			c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			alog.Warningf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			//fmt.Fprintf(rw,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			if s := req.Header.Get("Range"); s != "" {
 				if parts1 := strings.Split(s, "="); len(parts1) == 2 {
 					if parts2 := strings.Split(parts1[1], "-"); len(parts2) == 2 {
@@ -286,13 +306,19 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 				req.Header.Set("Range", fmt.Sprintf("bytes=0-%d", fetchMaxSize))
 			}
 		} else if strings.Contains(message, "Over quota") {
-			c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			alog.Warningf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			//fmt.Fprintf(rw,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			time.Sleep(DefaultOverquotaDelay)
 		} else if strings.Contains(message, "urlfetch: CLOSED") {
-			c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			alog.Warningf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			//fmt.Fprintf(rw,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			time.Sleep(DefaultURLFetchClosedDelay)
 		} else {
-			c.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			//c.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			alog.Errorf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			//fmt.Fprintf(rw,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			break
 		}
 	}
@@ -372,11 +398,13 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	}
 
 	if debug > 1 {
-		c.Infof("Write Response=%#v, chunked=%#v\n", resp, chunked)
+		//c.Infof("Write Response=%#v, chunked=%#v\n", resp, chunked)
+		alog.Infof(c,"Write Response=%#v, chunked=%#v\n", resp, chunked)
+		//fmt.Fprintf(rw,"Write Response=%#v, chunked=%#v\n", resp, chunked)
 	}
 
 	if debug > 0 {
-		c.Infof("%s \"%s %s %s\" %d %s", resp.Request.RemoteAddr, resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto, resp.StatusCode, resp.Header.Get("Content-Length"))
+		fmt.Fprintf(rw,"%s \"%s %s %s\" %d %s", resp.Request.RemoteAddr, resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto, resp.StatusCode, resp.Header.Get("Content-Length"))
 	}
 
 	b := &bytes.Buffer{}
@@ -416,13 +444,15 @@ func robots(rw http.ResponseWriter, r *http.Request) {
 }
 
 func root(rw http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
+	//c := appengine.NewContext(r)
+	c :=r.Context()
 
 	version, _ := strconv.ParseInt(strings.Split(appengine.VersionID(c), ".")[1], 10, 64)
 	ctime := time.Unix(version/(1<<28), 0).Format(time.RFC3339)
 
 	var latest string
 	t := &urlfetch.Transport{Context: c}
+	//var t http.Transport; //???
 	req, _ := http.NewRequest("GET", "https://github.com/SeaHOH/GotoX/commits/gaeserver.goproxy/gae", nil)
 	resp, err := t.RoundTrip(req)
 	if err != nil {
@@ -461,3 +491,23 @@ func init() {
 	http.HandleFunc("/robots.txt", robots)
 	http.HandleFunc("/", root)
 }
+
+
+func main(){
+	//http.HandleFunc("/_gh/", handler)
+	//http.HandleFunc("/favicon.ico", favicon)
+	//http.HandleFunc("/robots.txt", robots)
+	//http.HandleFunc("/", root)
+	appengine.Main()
+	port := os.Getenv("PORT")
+	if port == "" {
+		        port = "8080"
+			        log.Printf("Defaulting to port %s", port)
+			}
+
+			log.Printf("Listening on port %s", port)
+			if err := http.ListenAndServe(":"+port, nil); err != nil {
+				        log.Fatal(err)
+				}
+}
+
