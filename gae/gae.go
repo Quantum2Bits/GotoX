@@ -28,9 +28,9 @@ import (
 
 	//OldApp "appengine"
 	//OldUrl "appengine/urlfetch"
-	"google.golang.org/appengine"
-	alog "google.golang.org/appengine/log"
-	"google.golang.org/appengine/urlfetch"
+	//"google.golang.org/appengine"
+	//alog "google.golang.org/appengine/log"
+	//"google.golang.org/appengine/urlfetch"
 	//"appengine"
 	//"appengine/urlfetch"
 )
@@ -140,7 +140,7 @@ func ReadRequest(r io.Reader) (req *http.Request, err error) {
 
 	return
 }
-
+/*
 func fmtError(c context.Context, err error) string {
 	return fmt.Sprintf(`{
     "type": "appengine(%s, %s/%s)",
@@ -149,6 +149,15 @@ func fmtError(c context.Context, err error) string {
     "error": "%s"
 }
 `, runtime.Version(), runtime.GOOS, runtime.GOARCH, appengine.DefaultVersionHostname(c), appengine.ServerSoftware(), err.Error())
+}*/
+func fmtError(c context.Context, err error) string {
+	return fmt.Sprintf(`{
+    "type": "appengine(%s, %s/%s)",
+    "host": "%s",
+    "software": "%s",
+    "error": "%s"
+}
+`, runtime.Version(), runtime.GOOS, runtime.GOARCH, "jie-quanlin-app3.df.r.appspot.com", os.Getenv("GAE_ENV"), err.Error())
 }
 
 func handlerError(c context.Context, rw http.ResponseWriter, err error, code int) {
@@ -181,7 +190,8 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	var hdrLen uint16
 	if err := binary.Read(r.Body, binary.BigEndian, &hdrLen); err != nil {
 		//c.Criticalf("binary.Read(&hdrLen) return %v", err)
-		alog.Criticalf(c,"binary.Read(&hdrLen) return %v", err)
+		//alog.Criticalf(c,"binary.Read(&hdrLen) return %v", err)
+		log.Printf("binary.Read(&hdrLen) return %v", err)
 		//fmt.Fprintf(rw,"binary.Read(&hdrLen) return %v", err)
 		handlerError(c, rw, err, http.StatusBadRequest)
 		return
@@ -190,7 +200,8 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	req, err := ReadRequest(bufio.NewReader(flate.NewReader(&io.LimitedReader{R: r.Body, N: int64(hdrLen)})))
 	if err != nil {
 		//c.Criticalf("http.ReadRequest(%#v) return %#v", r.Body, err)
-		alog.Criticalf(c,"http.ReadRequest(%#v) return %#v", r.Body, err)
+		//alog.Criticalf(c,"http.ReadRequest(%#v) return %#v", r.Body, err)
+		log.Printf("http.ReadRequest(%#v) return %#v", r.Body, err)
 		//fmt.Fprintf(rw,"http.ReadRequest(%#v) return %#v", r.Body, err)
 		handlerError(c, rw, err, http.StatusBadRequest)
 		return
@@ -225,7 +236,8 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 
 	if debug > 1 {
 		//c.Infof("Parsed Request=%#v\n", req)
-		alog.Infof(c,"Parsed Request=%#v\n", req)
+		//alog.Infof(c,"Parsed Request=%#v\n", req)
+		log.Printf("Parsed Request=%#v\n", req)
 		//fmt.Fprintf(rw,"Parsed Request=%#v\n", req)
 	}
 
@@ -254,15 +266,20 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	_, sslVerify := params["sslverify"]
+	//_, sslVerify := params["sslverify"]
 
 	var resp *http.Response
 	for i := 0; i < 2; i++ {
-		t := &urlfetch.Transport{
+		/*t := &urlfetch.Transport{
 			Context:                       c,
 			//Deadline:                      deadline,
 			AllowInvalidServerCertificate: !sslVerify,
-		}
+		}*/
+		t := &http.Transport{
+			//IdleConnTimeout:              deadline,
+			//ResponseHeaderTimeout:        deadline,
+			//ExpectContinueTimeout:        deadline,
+		}; //???
 		//var t http.Transport; //???
 
 		resp, err = t.RoundTrip(req)
@@ -283,7 +300,8 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		message := err.Error()
 		if strings.Contains(message, "RESPONSE_TOO_LARGE") {
 			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			alog.Warningf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			//alog.Warningf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//fmt.Fprintf(rw,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			if s := req.Header.Get("Range"); s != "" {
 				if parts1 := strings.Split(s, "="); len(parts1) == 2 {
@@ -307,17 +325,20 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			}
 		} else if strings.Contains(message, "Over quota") {
 			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			alog.Warningf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			//alog.Warningf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//fmt.Fprintf(rw,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			time.Sleep(DefaultOverquotaDelay)
 		} else if strings.Contains(message, "urlfetch: CLOSED") {
 			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			alog.Warningf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			//alog.Warningf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//fmt.Fprintf(rw,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			time.Sleep(DefaultURLFetchClosedDelay)
 		} else {
 			//c.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			alog.Errorf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			//alog.Errorf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//fmt.Fprintf(rw,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			break
 		}
@@ -399,7 +420,8 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 
 	if debug > 1 {
 		//c.Infof("Write Response=%#v, chunked=%#v\n", resp, chunked)
-		alog.Infof(c,"Write Response=%#v, chunked=%#v\n", resp, chunked)
+		//alog.Infof(c,"Write Response=%#v, chunked=%#v\n", resp, chunked)
+		log.Printf("Write Response=%#v, chunked=%#v\n", resp, chunked)
 		//fmt.Fprintf(rw,"Write Response=%#v, chunked=%#v\n", resp, chunked)
 	}
 
@@ -445,13 +467,16 @@ func robots(rw http.ResponseWriter, r *http.Request) {
 
 func root(rw http.ResponseWriter, r *http.Request) {
 	//c := appengine.NewContext(r)
-	c :=r.Context()
+	//c :=r.Context()
 
-	version, _ := strconv.ParseInt(strings.Split(appengine.VersionID(c), ".")[1], 10, 64)
-	ctime := time.Unix(version/(1<<28), 0).Format(time.RFC3339)
+	//version, _ := strconv.ParseInt(strings.Split(appengine.VersionID(c), ".")[1], 10, 64)
+	//ctime := time.Unix(version/(1<<28), 0).Format(time.RFC3339)
+	var version int64 = ((2020-1970)*365+6*30+18)*24*60*60
+	ctime := time.Unix(version, 0).Format(time.RFC3339)
 
 	var latest string
-	t := &urlfetch.Transport{Context: c}
+	//t := &urlfetch.Transport{Context: c}
+	t := &http.Transport{}; //???
 	//var t http.Transport; //???
 	req, _ := http.NewRequest("GET", "https://github.com/SeaHOH/GotoX/commits/gaeserver.goproxy/gae", nil)
 	resp, err := t.RoundTrip(req)
@@ -483,6 +508,15 @@ func root(rw http.ResponseWriter, r *http.Request) {
 	"message": "%s"
 }
 `, Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, latest, ctime, message)
+
+    fmt.Fprintf(rw, `{
+    "type": "appengine(%s, %s/%s)",
+    "host": "%s",
+    "software": "%s",
+    "port": "%s" ,
+    "project_id": "%s"
+}
+`, runtime.Version(), runtime.GOOS, runtime.GOARCH, "appengine.DefaultVersionHostname(c)", os.Getenv("GAE_ENV"),os.Getenv("PORT"),os.Getenv("GOOGLE_CLOUD_PROJECT"))
 }
 
 func init() {
@@ -498,7 +532,7 @@ func main(){
 	//http.HandleFunc("/favicon.ico", favicon)
 	//http.HandleFunc("/robots.txt", robots)
 	//http.HandleFunc("/", root)
-	appengine.Main()
+	//appengine.Main()
 	port := os.Getenv("PORT")
 	if port == "" {
 		        port = "8080"
