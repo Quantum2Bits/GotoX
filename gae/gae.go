@@ -151,13 +151,16 @@ func fmtError(c context.Context, err error) string {
 `, runtime.Version(), runtime.GOOS, runtime.GOARCH, appengine.DefaultVersionHostname(c), appengine.ServerSoftware(), err.Error())
 }*/
 func fmtError(c context.Context, err error) string {
+	//pjid := os.Getenv("GCP_PROJECT")
+	//pjid := os.Getenv("GAE_APPLICATION")
+	pjid := os.Getenv("GOOGLE_CLOUD_PROJECT")
 	return fmt.Sprintf(`{
     "type": "appengine(%s, %s/%s)",
     "host": "%s",
     "software": "%s",
     "error": "%s"
 }
-`, runtime.Version(), runtime.GOOS, runtime.GOARCH, "jie-quanlin-app3.df.r.appspot.com", os.Getenv("GAE_ENV"), err.Error())
+`, runtime.Version(), runtime.GOOS, runtime.GOARCH, pjid+".df.r.appspot.com", os.Getenv("GAE_ENV"), err.Error())
 }
 
 func handlerError(c context.Context, rw http.ResponseWriter, err error, code int) {
@@ -277,7 +280,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		}*/
 		t := &http.Transport{
 			//IdleConnTimeout:              deadline,
-			//ResponseHeaderTimeout:        deadline,
+			ResponseHeaderTimeout:        deadline,
 			//ExpectContinueTimeout:        deadline,
 		}; //???
 		//var t http.Transport; //???
@@ -517,21 +520,26 @@ func root(rw http.ResponseWriter, r *http.Request) {
     "project_id": "%s"
 }
 `, runtime.Version(), runtime.GOOS, runtime.GOARCH, "appengine.DefaultVersionHostname(c)", os.Getenv("GAE_ENV"),os.Getenv("PORT"),os.Getenv("GOOGLE_CLOUD_PROJECT"))
+   
+   env := os.Environ();
+   for i := 0;i< len(env);i=i+1{
+      fmt.Fprintf(rw,"%v\n",env[i]);
+   }
 }
 
-func init() {
+/*func init() {
 	http.HandleFunc("/_gh/", handler)
 	http.HandleFunc("/favicon.ico", favicon)
 	http.HandleFunc("/robots.txt", robots)
 	http.HandleFunc("/", root)
-}
+}*/
 
 
 func main(){
-	//http.HandleFunc("/_gh/", handler)
-	//http.HandleFunc("/favicon.ico", favicon)
-	//http.HandleFunc("/robots.txt", robots)
-	//http.HandleFunc("/", root)
+	http.HandleFunc("/_gh/", handler)
+	http.HandleFunc("/favicon.ico", favicon)
+	http.HandleFunc("/robots.txt", robots)
+	http.HandleFunc("/", root)
 	//appengine.Main()
 	port := os.Getenv("PORT")
 	if port == "" {
