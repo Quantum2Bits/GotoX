@@ -1,5 +1,5 @@
-package main
 //package gae
+package main
 
 import (
 	"bufio"
@@ -12,9 +12,7 @@ import (
 	"io"
 	"io/ioutil"
 	"mime"
-	"net"
 	"net/http"
-	"crypto/tls"
 	"net/url"
 	"path/filepath"
 	"reflect"
@@ -24,6 +22,8 @@ import (
 	"strings"
 	"time"
 
+	"net"
+	"crypto/tls"
 	"log"
 	"os"
 	"context"
@@ -142,8 +142,8 @@ func ReadRequest(r io.Reader) (req *http.Request, err error) {
 
 	return
 }
-/*
-func fmtError(c context.Context, err error) string {
+
+/*func fmtError(c appengine.Context, err error) string {
 	return fmt.Sprintf(`{
     "type": "appengine(%s, %s/%s)",
     "host": "%s",
@@ -195,9 +195,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	var hdrLen uint16
 	if err := binary.Read(r.Body, binary.BigEndian, &hdrLen); err != nil {
 		//c.Criticalf("binary.Read(&hdrLen) return %v", err)
-		//alog.Criticalf(c,"binary.Read(&hdrLen) return %v", err)
 		//log.Printf("binary.Read(&hdrLen) return %v", err)
-		//fmt.Fprintf(rw,"binary.Read(&hdrLen) return %v", err)
 		handlerError(c, rw, err, http.StatusBadRequest)
 		return
 	}
@@ -205,9 +203,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	req, err := ReadRequest(bufio.NewReader(flate.NewReader(&io.LimitedReader{R: r.Body, N: int64(hdrLen)})))
 	if err != nil {
 		//c.Criticalf("http.ReadRequest(%#v) return %#v", r.Body, err)
-		//alog.Criticalf(c,"http.ReadRequest(%#v) return %#v", r.Body, err)
 		//log.Printf("http.ReadRequest(%#v) return %#v", r.Body, err)
-		//fmt.Fprintf(rw,"http.ReadRequest(%#v) return %#v", r.Body, err)
 		handlerError(c, rw, err, http.StatusBadRequest)
 		return
 	}
@@ -241,9 +237,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 
 	if debug > 1 {
 		//c.Infof("Parsed Request=%#v\n", req)
-		//alog.Infof(c,"Parsed Request=%#v\n", req)
 		//log.Printf("Parsed Request=%#v\n", req)
-		//fmt.Fprintf(rw,"Parsed Request=%#v\n", req)
 	}
 
 	if Password != "" {
@@ -274,28 +268,20 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	_, sslVerify := params["sslverify"]
 
 	var resp *http.Response
-	//for i := 0; i < 2; i++ {
+	xzero := map[string]func(string,*tls.Conn) http.RoundTripper{}
+	for i := 0; i < 2; i++ {
 		/*t := &urlfetch.Transport{
 			Context:                       c,
-			//Deadline:                      deadline,
+			Deadline:                      deadline,
 			AllowInvalidServerCertificate: !sslVerify,
 		}*/
-		/*t := &http.Transport{
-			//IdleConnTimeout:              deadline,
-			ResponseHeaderTimeout:        deadline,
-			//ExpectContinueTimeout:        deadline,
-			ForceAttemptHTTP2:            false,
-		};*/ //???
-		//var t http.Transport; //???
-                 t := &http.Transport{
+                t := http.Transport{
                        DialContext: (&net.Dialer{
                            Timeout:   30 * time.Second,
                            KeepAlive: 30 * time.Second,
                            DualStack: true,
                            }).DialContext,
 		       TLSClientConfig: &tls.Config{
-		          // Set InsecureSkipVerify to skip the default validation we are
-		          // replacing. This will not disable VerifyConnection.
 		          InsecureSkipVerify: !sslVerify,
 		          //InsecureSkipVerify: true,
 		          /*VerifyConnection: func(cs tls.ConnectionState) error {
@@ -313,17 +299,14 @@ func handler(rw http.ResponseWriter, r *http.Request) {
                        //ForceAttemptHTTP2:     false,
 		       ResponseHeaderTimeout:        deadline,
                        MaxIdleConns:          10,
-                       IdleConnTimeout:       50 * time.Second,
+                       IdleConnTimeout:       30 * time.Second,
                        TLSHandshakeTimeout:   10 * time.Second,
                        ExpectContinueTimeout: 3 * time.Second,
-	       }
-	for i := 0; i < 2; i++ {
-               /*clt := http.Client{
-		       Transport: t,
-	       }*/
+		       DisableCompression:    true,
+		       TLSNextProto:          xzero,
+	        }
 
 		resp, err = t.RoundTrip(req)
-		//resp, err = clt.Do(req)
 		if resp != nil && resp.Body != nil {
 			if v := reflect.ValueOf(resp.Body).Elem().FieldByName("truncated"); v.IsValid() {
 				if truncated := v.Bool(); truncated {
@@ -341,9 +324,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		message := err.Error()
 		if strings.Contains(message, "RESPONSE_TOO_LARGE") {
 			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			//alog.Warningf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			//fmt.Fprintf(rw,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			if s := req.Header.Get("Range"); s != "" {
 				if parts1 := strings.Split(s, "="); len(parts1) == 2 {
 					if parts2 := strings.Split(parts1[1], "-"); len(parts2) == 2 {
@@ -366,21 +347,15 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			}
 		} else if strings.Contains(message, "Over quota") {
 			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			//alog.Warningf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			//fmt.Fprintf(rw,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			time.Sleep(DefaultOverquotaDelay)
 		} else if strings.Contains(message, "urlfetch: CLOSED") {
 			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			//alog.Warningf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			//fmt.Fprintf(rw,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			time.Sleep(DefaultURLFetchClosedDelay)
 		} else {
 			//c.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			//alog.Errorf(c,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			//fmt.Fprintf(rw,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			break
 		}
 	}
@@ -461,13 +436,11 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 
 	if debug > 1 {
 		//c.Infof("Write Response=%#v, chunked=%#v\n", resp, chunked)
-		//alog.Infof(c,"Write Response=%#v, chunked=%#v\n", resp, chunked)
 		//log.Printf("Write Response=%#v, chunked=%#v\n", resp, chunked)
-		//fmt.Fprintf(rw,"Write Response=%#v, chunked=%#v\n", resp, chunked)
 	}
 
 	if debug > 0 {
-		//fmt.Fprintf(rw,"%s \"%s %s %s\" %d %s", resp.Request.RemoteAddr, resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto, resp.StatusCode, resp.Header.Get("Content-Length"))
+		//c.Infof("%s \"%s %s %s\" %d %s", resp.Request.RemoteAddr, resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto, resp.StatusCode, resp.Header.Get("Content-Length"))
 		//log.Printf("%s \"%s %s %s\" %d %s", resp.Request.RemoteAddr, resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto, resp.StatusCode, resp.Header.Get("Content-Length"))
 	}
 
@@ -507,6 +480,45 @@ func robots(rw http.ResponseWriter, r *http.Request) {
 	io.WriteString(rw, "User-agent: *\nDisallow: /\n")
 }
 
+/*func root(rw http.ResponseWriter, r *http.Request) {
+	c := appengine.NewContext(r)
+
+	version, _ := strconv.ParseInt(strings.Split(appengine.VersionID(c), ".")[1], 10, 64)
+	ctime := time.Unix(version/(1<<28), 0).Format(time.RFC3339)
+
+	var latest string
+	t := &urlfetch.Transport{Context: c}
+	req, _ := http.NewRequest("GET", "https://github.com/SeaHOH/GotoX/commits/gaeserver.goproxy/gae", nil)
+	resp, err := t.RoundTrip(req)
+	if err != nil {
+		latest = err.Error()
+	} else {
+		data, err := ioutil.ReadAll(resp.Body)
+		if err != nil {
+			latest = err.Error()
+		} else {
+			latest = regexp.MustCompile(`\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ`).FindString(string(data))
+		}
+	}
+
+	rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
+	var message string
+	switch {
+	case latest == "":
+		message = "unable check goproxy latest version, please try after 5 minutes."
+	case latest <= ctime:
+		message = "already update to latest."
+	default:
+		message = "please update this server"
+	}
+	fmt.Fprintf(rw, `{
+	"server": "goproxy %s (%s, %s/%s)"
+	"latest": "%s",
+	"deploy": "%s",
+	"message": "%s"
+}
+`, Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, latest, ctime, message)
+}*/
 func root(rw http.ResponseWriter, r *http.Request) {
 	//c := appengine.NewContext(r)
 	//c :=r.Context()
@@ -566,74 +578,18 @@ func root(rw http.ResponseWriter, r *http.Request) {
    }
 }
 
-func init() {
+/*func init() {
 	http.HandleFunc("/_gh/", handler)
 	http.HandleFunc("/favicon.ico", favicon)
 	http.HandleFunc("/robots.txt", robots)
 	http.HandleFunc("/", root)
-}
-
-/*func Main() {
-	MainPath = filepath.Dir(findMainPath())
-	installHealthChecker(http.DefaultServeMux)
-
-	port := "8080"
-	if s := os.Getenv("PORT"); s != "" {
-		port = s
-	}
-
-	host := ""
-	if IsDevAppServer() {
-		host = "127.0.0.1"
-	}
-	if err := http.ListenAndServe(host+":"+port, http.HandlerFunc(handleHTTP)); err != nil {
-		log.Fatalf("http.ListenAndServe: %v", err)
-	}
 }*/
-
-// Find the path to package main by looking at the root Caller.
-func findMainPath() string {
-	pc := make([]uintptr, 100)
-	n := runtime.Callers(2, pc)
-	frames := runtime.CallersFrames(pc[:n])
-	for {
-		frame, more := frames.Next()
-		// Tests won't have package main, instead they have testing.tRunner
-		if frame.Function == "main.main" || frame.Function == "testing.tRunner" {
-			return frame.File
-		}
-		if !more {
-			break
-		}
-	}
-	return ""
-}
-
-func installHealthChecker(mux *http.ServeMux) {
-	// If no health check handler has been installed by this point, add a trivial one.
-	const healthPath = "/_ah/health"
-	hreq := &http.Request{
-		Method: "GET",
-		URL: &url.URL{
-			Path: healthPath,
-		},
-	}
-	if _, pat := mux.Handler(hreq); pat != healthPath {
-		mux.HandleFunc(healthPath, func(w http.ResponseWriter, r *http.Request) {
-			io.WriteString(w, "ok")
-		})
-	}
-}
-
-func mainj(){
-	//appengine.Main()
-}
-    //var MainPath string
 func main(){
-	//http.HandleFunc("/_gh/", handler)
-	//http.HandleFunc("/favicon.ico", favicon)
-	//http.HandleFunc("/robots.txt", robots)
-	//http.HandleFunc("/", root)
+	//os.Setenv("GODEBUG","http2client=0")
+	http.HandleFunc("/_gh/", handler)
+	http.HandleFunc("/favicon.ico", favicon)
+	http.HandleFunc("/robots.txt", robots)
+	http.HandleFunc("/", root)
 	//appengine.Main()
 	//MainPath = filepath.Dir(findMainPath())
 	//installHealthChecker(http.DefaultServeMux)
@@ -656,4 +612,3 @@ func main(){
 		log.Fatalf("http.ListenAndServe: %v", err)
 	}*/
 }
-
