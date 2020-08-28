@@ -196,6 +196,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	if err := binary.Read(r.Body, binary.BigEndian, &hdrLen); err != nil {
 		//c.Criticalf("binary.Read(&hdrLen) return %v", err)
 		//log.Printf("binary.Read(&hdrLen) return %v", err)
+		fmt.Fprintf(os.Stderr,"binary.Read(&hdrLen) return %v", err)
 		handlerError(c, rw, err, http.StatusBadRequest)
 		return
 	}
@@ -204,6 +205,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		//c.Criticalf("http.ReadRequest(%#v) return %#v", r.Body, err)
 		//log.Printf("http.ReadRequest(%#v) return %#v", r.Body, err)
+		fmt.Fprintf(os.Stderr,"http.ReadRequest(%#v) return %#v", r.Body, err)
 		handlerError(c, rw, err, http.StatusBadRequest)
 		return
 	}
@@ -238,6 +240,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	if debug > 1 {
 		//c.Infof("Parsed Request=%#v\n", req)
 		//log.Printf("Parsed Request=%#v\n", req)
+		fmt.Fprintf(os.Stderr,"Parsed Request=%#v\n", req)
 	}
 
 	if Password != "" {
@@ -268,20 +271,19 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	_, sslVerify := params["sslverify"]
 
 	var resp *http.Response
-	xzero := map[string]func(string,*tls.Conn) http.RoundTripper{}
+         /*tlsdial := &tls.Dialer{
+		         NetDialer: netdial,
+			 Config:    tlsconf,
+		    }*/
+	//xzero := map[string]func(string,*tls.Conn) http.RoundTripper{}
+	req = req.Clone(c)
 	for i := 0; i < 2; i++ {
-		/*t := &urlfetch.Transport{
-			Context:                       c,
-			Deadline:                      deadline,
-			AllowInvalidServerCertificate: !sslVerify,
-		}*/
-                t := http.Transport{
-                       DialContext: (&net.Dialer{
-                           Timeout:   30 * time.Second,
-                           KeepAlive: 30 * time.Second,
-                           DualStack: true,
-                           }).DialContext,
-		       TLSClientConfig: &tls.Config{
+	   netdial := &net.Dialer{
+                     Timeout:   30 * time.Second,
+                     KeepAlive: 30 * time.Second,
+                     DualStack: true,
+                   }
+           tlsconf := &tls.Config{
 		          InsecureSkipVerify: !sslVerify,
 		          //InsecureSkipVerify: true,
 		          /*VerifyConnection: func(cs tls.ConnectionState) error {
@@ -295,18 +297,28 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			      _, err := cs.PeerCertificates[0].Verify(opts)
 			      return err
 		          },*/
-	               },
+	           }
+		/*t := &urlfetch.Transport{
+			Context:                       c,
+			Deadline:                      deadline,
+			AllowInvalidServerCertificate: !sslVerify,
+		}*/
+                t := http.Transport{
+                       DialContext: netdial.DialContext,
+		       TLSClientConfig: tlsconf,
+		       //DialTLSContext:  tlsdial.DialContext,
                        //ForceAttemptHTTP2:     false,
 		       ResponseHeaderTimeout:        deadline,
-                       MaxIdleConns:          10,
-                       IdleConnTimeout:       30 * time.Second,
+                       //MaxIdleConns:          10,
+                       //IdleConnTimeout:       30 * time.Second,
                        TLSHandshakeTimeout:   10 * time.Second,
                        ExpectContinueTimeout: 3 * time.Second,
 		       DisableCompression:    true,
-		       TLSNextProto:          xzero,
+		       //TLSNextProto:          xzero,
 	        }
 
 		resp, err = t.RoundTrip(req)
+		//resp, err = t.RoundTrip(req.Clone(c))
 		if resp != nil && resp.Body != nil {
 			if v := reflect.ValueOf(resp.Body).Elem().FieldByName("truncated"); v.IsValid() {
 				if truncated := v.Bool(); truncated {
@@ -325,6 +337,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		if strings.Contains(message, "RESPONSE_TOO_LARGE") {
 			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			fmt.Fprintf(os.Stderr,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			if s := req.Header.Get("Range"); s != "" {
 				if parts1 := strings.Split(s, "="); len(parts1) == 2 {
 					if parts2 := strings.Split(parts1[1], "-"); len(parts2) == 2 {
@@ -348,14 +361,16 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		} else if strings.Contains(message, "Over quota") {
 			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			fmt.Fprintf(os.Stderr,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			time.Sleep(DefaultOverquotaDelay)
 		} else if strings.Contains(message, "urlfetch: CLOSED") {
 			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			fmt.Fprintf(os.Stderr,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			time.Sleep(DefaultURLFetchClosedDelay)
 		} else {
 			//c.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			fmt.Fprintf(os.Stderr,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			break
 		}
 	}
@@ -437,11 +452,13 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	if debug > 1 {
 		//c.Infof("Write Response=%#v, chunked=%#v\n", resp, chunked)
 		//log.Printf("Write Response=%#v, chunked=%#v\n", resp, chunked)
+		fmt.Fprintf(os.Stderr,"Write Response=%#v, chunked=%#v\n", resp, chunked)
 	}
 
 	if debug > 0 {
 		//c.Infof("%s \"%s %s %s\" %d %s", resp.Request.RemoteAddr, resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto, resp.StatusCode, resp.Header.Get("Content-Length"))
 		//log.Printf("%s \"%s %s %s\" %d %s", resp.Request.RemoteAddr, resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto, resp.StatusCode, resp.Header.Get("Content-Length"))
+		fmt.Fprintf(os.Stderr,"%s \"%s %s %s\" %d %s", resp.Request.RemoteAddr, resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto, resp.StatusCode, resp.Header.Get("Content-Length"))
 	}
 
 	b := &bytes.Buffer{}
@@ -587,6 +604,7 @@ func root(rw http.ResponseWriter, r *http.Request) {
 func main(){
 	//os.Setenv("GODEBUG","http2client=0")
 	http.HandleFunc("/_gh/", handler)
+	http.HandleFunc("/g", handler)
 	http.HandleFunc("/favicon.ico", favicon)
 	http.HandleFunc("/robots.txt", robots)
 	http.HandleFunc("/", root)
@@ -595,7 +613,7 @@ func main(){
 	//installHealthChecker(http.DefaultServeMux)
 	port := os.Getenv("PORT")
 	if port == "" {
-	        port = "8080"
+	        port = "80"
 	        //log.Printf("Defaulting to port %s", port)
 	}
 
