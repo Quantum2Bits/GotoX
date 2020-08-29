@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	"net"
+	//"net"
 	"crypto/tls"
 	"log"
 	"os"
@@ -276,15 +276,15 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			 Config:    tlsconf,
 		    }*/
 	//xzero := map[string]func(string,*tls.Conn) http.RoundTripper{}
-        ctx, cancel := context.WithTimeout(c, deadline)
-	defer cancel()
-	req = req.Clone(ctx)
+        //ctx, cancel := context.WithTimeout(c, deadline)
+	//defer cancel()
+	//req = req.Clone(c)
 	for i := 0; i < 2; i++ {
-	   netdial := &net.Dialer{
+	   /*netdial := &net.Dialer{
                      Timeout:   30 * time.Second,
                      KeepAlive: 30 * time.Second,
                      DualStack: true,
-                   }
+                   }*/
            tlsconf := &tls.Config{
 		          InsecureSkipVerify: !sslVerify,
 		          //InsecureSkipVerify: true,
@@ -306,7 +306,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			AllowInvalidServerCertificate: !sslVerify,
 		}*/
                 t := http.Transport{
-                       DialContext: netdial.DialContext,
+                       //DialContext: netdial.DialContext,
 		       TLSClientConfig: tlsconf,
 		       //DialTLSContext:  tlsdial.DialContext,
                        //ForceAttemptHTTP2:     false,
@@ -624,19 +624,20 @@ func main(){
 		//host = "127.0.0.1"
 	//}
 	//log.Printf("Listening on port %s", port)
-	/*if err := http.ListenAndServe(host+":"+port, nil); err != nil {
+	if err := http.ListenAndServe(host+":"+port, nil); err != nil {
 	        log.Fatal(err)
-	}*/
+	}
 
 	/*if err := http.ListenAndServe(host+":"+port, http.HandlerFunc(handleHTTP)); err != nil {
 		log.Fatalf("http.ListenAndServe: %v", err)
 	}*/
-        s := &http.Server{
+        /*s := &http.Server{
            Addr:           host+":"+port,
 	   Handler:        nil,
 	   ReadTimeout:    10 * time.Second,
 	   WriteTimeout:   10 * time.Second,
 	   MaxHeaderBytes: 1 << 20,
        }
-       log.Fatal(s.ListenAndServe())
+       log.Fatal(s.ListenAndServe())*/
+       //log.Print(s.ListenAndServe())
 }
