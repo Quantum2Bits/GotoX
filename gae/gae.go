@@ -276,7 +276,9 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			 Config:    tlsconf,
 		    }*/
 	//xzero := map[string]func(string,*tls.Conn) http.RoundTripper{}
-	req = req.Clone(c)
+        ctx, cancel := context.WithTimeout(c, deadline)
+	defer cancel()
+	req = req.Clone(ctx)
 	for i := 0; i < 2; i++ {
 	   netdial := &net.Dialer{
                      Timeout:   30 * time.Second,
@@ -622,11 +624,19 @@ func main(){
 		//host = "127.0.0.1"
 	//}
 	//log.Printf("Listening on port %s", port)
-	if err := http.ListenAndServe(host+":"+port, nil); err != nil {
+	/*if err := http.ListenAndServe(host+":"+port, nil); err != nil {
 	        log.Fatal(err)
-	}
+	}*/
 
 	/*if err := http.ListenAndServe(host+":"+port, http.HandlerFunc(handleHTTP)); err != nil {
 		log.Fatalf("http.ListenAndServe: %v", err)
 	}*/
+        s := &http.Server{
+           Addr:           host+":"+port,
+	   Handler:        nil,
+	   ReadTimeout:    10 * time.Second,
+	   WriteTimeout:   10 * time.Second,
+	   MaxHeaderBytes: 1 << 20,
+       }
+       log.Fatal(s.ListenAndServe())
 }
