@@ -26,13 +26,13 @@ import (
 	"crypto/tls"
 	"log"
 	"os"
-	"context"
+	//"context"
 
 	//OldApp "appengine"
 	//OldUrl "appengine/urlfetch"
 	//"google.golang.org/appengine"
-	//alog "google.golang.org/appengine/log"
 	//"google.golang.org/appengine/urlfetch"
+	//alog "google.golang.org/appengine/log"
 	//"appengine"
 	//"appengine/urlfetch"
 )
@@ -152,7 +152,7 @@ func ReadRequest(r io.Reader) (req *http.Request, err error) {
 }
 `, runtime.Version(), runtime.GOOS, runtime.GOARCH, appengine.DefaultVersionHostname(c), appengine.ServerSoftware(), err.Error())
 }*/
-func fmtError(c context.Context, err error) string {
+func fmtError(err error) string {
 	//pjid := os.Getenv("GCP_PROJECT")
 	//pjid := os.Getenv("GAE_APPLICATION")
 	pjid := os.Getenv("GOOGLE_CLOUD_PROJECT")
@@ -165,11 +165,11 @@ func fmtError(c context.Context, err error) string {
 `, runtime.Version(), runtime.GOOS, runtime.GOARCH, pjid+".appspot.com", os.Getenv("GAE_ENV"), err.Error())
 }
 
-func handlerError(c context.Context, rw http.ResponseWriter, err error, code int) {
+func handlerError(rw http.ResponseWriter, err error, code int) {
 	var b bytes.Buffer
 	w, _ := flate.NewWriter(&b, flate.BestCompression)
 
-	data := fmtError(c, err)
+	data := fmtError(err)
 	fmt.Fprintf(w, "HTTP/1.1 %d\r\n", code)
 	fmt.Fprintf(w, "Content-Type: text/plain; charset=utf-8\r\n")
 	fmt.Fprintf(w, "Content-Length: %d\r\n", len(data))
@@ -190,14 +190,14 @@ func handlerError(c context.Context, rw http.ResponseWriter, err error, code int
 func handler(rw http.ResponseWriter, r *http.Request) {
 	var err error
 	//c := appengine.NewContext(r)
-	c := r.Context()
+	//c := r.Context()
 
 	var hdrLen uint16
 	if err := binary.Read(r.Body, binary.BigEndian, &hdrLen); err != nil {
 		//c.Criticalf("binary.Read(&hdrLen) return %v", err)
 		//log.Printf("binary.Read(&hdrLen) return %v", err)
 		fmt.Fprintf(os.Stderr,"binary.Read(&hdrLen) return %v", err)
-		handlerError(c, rw, err, http.StatusBadRequest)
+		handlerError(rw, err, http.StatusBadRequest)
 		return
 	}
 
@@ -206,7 +206,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		//c.Criticalf("http.ReadRequest(%#v) return %#v", r.Body, err)
 		//log.Printf("http.ReadRequest(%#v) return %#v", r.Body, err)
 		fmt.Fprintf(os.Stderr,"http.ReadRequest(%#v) return %#v", r.Body, err)
-		handlerError(c, rw, err, http.StatusBadRequest)
+		handlerError(rw, err, http.StatusBadRequest)
 		return
 	}
 
@@ -246,10 +246,10 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	if Password != "" {
 		password, ok := params["password"]
 		if !ok {
-			handlerError(c, rw, fmt.Errorf("urlfetch password required"), http.StatusForbidden)
+			handlerError(rw, fmt.Errorf("urlfetch password required"), http.StatusForbidden)
 			return
 		} else if password != Password {
-			handlerError(c, rw, fmt.Errorf("urlfetch password is wrong"), http.StatusForbidden)
+			handlerError(rw, fmt.Errorf("urlfetch password is wrong"), http.StatusForbidden)
 			return
 		}
 	}
@@ -279,6 +279,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
         //ctx, cancel := context.WithTimeout(c, deadline)
 	//defer cancel()
 	//req = req.Clone(c)
+	//req = req.WithContext(ctx)
 	for i := 0; i < 2; i++ {
 	   /*netdial := &net.Dialer{
                      Timeout:   30 * time.Second,
@@ -286,7 +287,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
                      DualStack: true,
                    }*/
            tlsconf := &tls.Config{
-		          InsecureSkipVerify: !sslVerify,
+	          InsecureSkipVerify: !sslVerify,
 		          //InsecureSkipVerify: true,
 		          /*VerifyConnection: func(cs tls.ConnectionState) error {
 			      opts := x509.VerifyOptions{
@@ -298,14 +299,14 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			      }
 			      _, err := cs.PeerCertificates[0].Verify(opts)
 			      return err
-		          },*/
+		          },a*/
 	           }
 		/*t := &urlfetch.Transport{
 			Context:                       c,
-			Deadline:                      deadline,
+			//Deadline:                      deadline,
 			AllowInvalidServerCertificate: !sslVerify,
 		}*/
-                t := http.Transport{
+                t := &http.Transport{
                        //DialContext: netdial.DialContext,
 		       TLSClientConfig: tlsconf,
 		       //DialTLSContext:  tlsdial.DialContext,
@@ -318,8 +319,14 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		       DisableCompression:    true,
 		       //TLSNextProto:          xzero,
 	        }
+		/*clt := &http.Client{
+			Transport: t,
+			//CheckRedirect: http.redirectPolicyFunc,
+			Timeout:   deadline,
+		}*/
 
 		resp, err = t.RoundTrip(req)
+		//resp, err = clt.Do(req)
 		//resp, err = t.RoundTrip(req.Clone(c))
 		if resp != nil && resp.Body != nil {
 			if v := reflect.ValueOf(resp.Body).Elem().FieldByName("truncated"); v.IsValid() {
@@ -372,13 +379,13 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		} else {
 			//c.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			fmt.Fprintf(os.Stderr,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
+			fmt.Fprintf(os.Stderr," Unknown URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			break
 		}
 	}
 
 	if err != nil {
-		handlerError(c, rw, err, http.StatusBadGateway)
+		handlerError(rw, err, http.StatusBadGateway)
 		return
 	}
 
@@ -432,7 +439,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			}
 
 			if err != nil {
-				handlerError(c, rw, err, http.StatusBadGateway)
+				handlerError(rw, err, http.StatusBadGateway)
 				return
 			}
 
@@ -582,6 +589,10 @@ func root(rw http.ResponseWriter, r *http.Request) {
 }
 `, Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, latest, ctime, message)
 
+
+    data := fmtError(errors.New("ok"))
+    fmt.Fprintf(rw, "%s", data)
+
     fmt.Fprintf(rw, `{
     "type": "appengine(%s, %s/%s)",
     "host": "%s",
@@ -615,8 +626,8 @@ func main(){
 	//installHealthChecker(http.DefaultServeMux)
 	port := os.Getenv("PORT")
 	if port == "" {
-	        port = "80"
-	        //log.Printf("Defaulting to port %s", port)
+	        port = "8080"
+	        log.Printf("Defaulting to port %s", port)
 	}
 
         host := ""
