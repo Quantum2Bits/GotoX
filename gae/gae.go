@@ -280,7 +280,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	//defer cancel()
 	//req = req.Clone(c)
 	//req = req.WithContext(ctx)
-	for i := 0; i < 2; i++ {
+	for i := 0; i < 1; i++ { //loop
 	   /*netdial := &net.Dialer{
                      Timeout:   30 * time.Second,
                      KeepAlive: 30 * time.Second,
@@ -382,7 +382,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			fmt.Fprintf(os.Stderr," Unknown URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			break
 		}
-	}
+	}// loop end here
 
 	if err != nil {
 		handlerError(rw, err, http.StatusBadGateway)
@@ -625,19 +625,23 @@ func main(){
 	//MainPath = filepath.Dir(findMainPath())
 	//installHealthChecker(http.DefaultServeMux)
 	port := os.Getenv("PORT")
-	if port == "" {
-	        port = "8080"
-	        log.Printf("Defaulting to port %s", port)
-	}
-
         host := ""
+	if port == "" {
+	        port = "443"
+	        log.Printf("Defaulting to port %s", port)
+		err := http.ListenAndServeTLS(":"+port, "GoProxy.crt", "GoProxy.key", nil)
+	        //err := http.ListenAndServe(host+":"+port, nil);
+			log.Fatal(err)
+	}else{
+
 	//if IsDevAppServer() {
 		//host = "127.0.0.1"
 	//}
-	//log.Printf("Listening on port %s", port)
+	log.Printf("Listening on port %s", port)
 	if err := http.ListenAndServe(host+":"+port, nil); err != nil {
 	        log.Fatal(err)
 	}
+        }
 
 	/*if err := http.ListenAndServe(host+":"+port, http.HandlerFunc(handleHTTP)); err != nil {
 		log.Fatalf("http.ListenAndServe: %v", err)
