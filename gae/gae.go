@@ -22,7 +22,7 @@ import (
 	"strings"
 	"time"
 
-	//"net"
+	"net"
 	"crypto/tls"
 	"log"
 	"os"
@@ -281,11 +281,11 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	//req = req.Clone(c)
 	//req = req.WithContext(ctx)
 	for i := 0; i < 1; i++ { //loop
-	   /*netdial := &net.Dialer{
+	   netdial := &net.Dialer{
                      Timeout:   30 * time.Second,
                      KeepAlive: 30 * time.Second,
                      DualStack: true,
-                   }*/
+                   }
            tlsconf := &tls.Config{
 	          InsecureSkipVerify: !sslVerify,
 		          //InsecureSkipVerify: true,
@@ -307,7 +307,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			AllowInvalidServerCertificate: !sslVerify,
 		}*/
                 t := &http.Transport{
-                       //DialContext: netdial.DialContext,
+                       DialContext: netdial.DialContext,
 		       TLSClientConfig: tlsconf,
 		       //DialTLSContext:  tlsdial.DialContext,
                        //ForceAttemptHTTP2:     false,
@@ -319,14 +319,15 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		       DisableCompression:    true,
 		       //TLSNextProto:          xzero,
 	        }
-		/*clt := &http.Client{
+		clt := &http.Client{
 			Transport: t,
 			//CheckRedirect: http.redirectPolicyFunc,
 			Timeout:   deadline,
-		}*/
+		}
 
-		resp, err = t.RoundTrip(req)
-		//resp, err = clt.Do(req)
+		//resp, err = t.RoundTrip(req)
+		req.RequestURI = ""
+		resp, err = clt.Do(req)
 		//resp, err = t.RoundTrip(req.Clone(c))
 		if resp != nil && resp.Body != nil {
 			if v := reflect.ValueOf(resp.Body).Elem().FieldByName("truncated"); v.IsValid() {
@@ -343,6 +344,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		}
 
 		message := err.Error()
+		break  //---------------????
 		if strings.Contains(message, "RESPONSE_TOO_LARGE") {
 			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
