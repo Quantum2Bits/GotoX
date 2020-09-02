@@ -5,16 +5,16 @@ import (
 	"bufio"
 	"bytes"
 	"compress/flate"
-	"compress/gzip"
+	//"compress/gzip"
 	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"mime"
+	//"mime"
 	"net/http"
 	"net/url"
-	"path/filepath"
+	//"path/filepath"
 	"reflect"
 	"regexp"
 	"runtime"
@@ -228,7 +228,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		req.Header.Del("X-UrlFetch-Options")
 	}
 
-	oAE := req.Header.Get("Accept-Encoding")
+	//oAE := req.Header.Get("Accept-Encoding")
 
 	debug := DefaultDebug
 	if s, ok := params["debug"]; ok && s != "" {
@@ -400,12 +400,12 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		resp.Header.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
 	}
 
-	oCE := resp.Header.Get("Content-Encoding")
+	//oCE := resp.Header.Get("Content-Encoding")
 	chunked := false
 
 	// urlfetch will try to decompress the content when "Accept-Encoding" does not contain "gzip"
 	// delete "Content-Encoding" when content has decompressed with supported encoding
-	if !strings.Contains(oAE, "gzip") &&
+	/*if !strings.Contains(oAE, "gzip") &&
 		(oCE == "gzip" || oCE == "deflate" || oCE == "br") {
 		resp.Header.Del("Content-Encoding")
 		oCE = ""
@@ -458,7 +458,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-	}
+	}*/
 
 	if debug > 1 {
 		//c.Infof("Write Response=%#v, chunked=%#v\n", resp, chunked)
@@ -631,9 +631,37 @@ func main(){
 	if port == "" {
 	        port = "443"
 	        log.Printf("Defaulting to port %s", port)
-		err := http.ListenAndServeTLS(":"+port, "GoProxy.crt", "GoProxy.key", nil)
+		//err := http.ListenAndServeTLS(":"+port, "cert.pem", "key.pem", nil)
 	        //err := http.ListenAndServe(host+":"+port, nil);
-			log.Fatal(err)
+                tlsconf := &tls.Config{
+		          InsecureSkipVerify: true,
+			  //ClientAuth:         tls.RequestClientCert, //NoClientCert,
+                          //ClientAuth: tls.RequireAnyClientCert,
+                          //ClientAuth: tls.RequireAndVerifyClientCert,
+                          ClientAuth: tls.VerifyClientCertIfGiven,
+		          /*VerifyConnection: func(cs tls.ConnectionState) error {
+			      opts := x509.VerifyOptions{
+				DNSName:       cs.ServerName,
+				Intermediates: x509.NewCertPool(),
+			      }
+			      for _, cert := range cs.PeerCertificates[1:] {
+			        opts.Intermediates.AddCert(cert)
+			      }
+			      _, err := cs.PeerCertificates[0].Verify(opts)
+			      return err
+		          },*/
+	        }
+           srv := &http.Server{
+              Addr:           host+":"+port,
+	      Handler:        nil,
+              TLSConfig: tlsconf,
+	      ReadTimeout:    10 * time.Second,
+	      WriteTimeout:   10 * time.Second,
+	      MaxHeaderBytes: 1 << 20,
+          }
+	  //err := srv.ListenAndServe()
+	  err := srv.ListenAndServeTLS("cert.pem", "key.pem")
+	  log.Fatal(err)
 	}else{
 
 	//if IsDevAppServer() {
