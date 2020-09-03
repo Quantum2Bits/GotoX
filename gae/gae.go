@@ -5,7 +5,7 @@ import (
 	"bufio"
 	"bytes"
 	"compress/flate"
-	//"compress/gzip"
+	"compress/gzip"
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -228,7 +228,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		req.Header.Del("X-UrlFetch-Options")
 	}
 
-	//oAE := req.Header.Get("Accept-Encoding")
+	oAE := req.Header.Get("Accept-Encoding")
 
 	debug := DefaultDebug
 	if s, ok := params["debug"]; ok && s != "" {
@@ -316,7 +316,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
                        //IdleConnTimeout:       30 * time.Second,
                        TLSHandshakeTimeout:   10 * time.Second,
                        ExpectContinueTimeout: 3 * time.Second,
-		       DisableCompression:    true,
+		       //DisableCompression:    true,
 		       //TLSNextProto:          xzero,
 	        }
 		clt := &http.Client{
@@ -400,14 +400,14 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		resp.Header.Set("Content-Length", strconv.FormatInt(resp.ContentLength, 10))
 	}
 
-	//oCE := resp.Header.Get("Content-Encoding")
+	oCE := resp.Header.Get("Content-Encoding")
 	chunked := false
 
 	// urlfetch will try to decompress the content when "Accept-Encoding" does not contain "gzip"
 	// delete "Content-Encoding" when content has decompressed with supported encoding
-	/*if !strings.Contains(oAE, "gzip") &&
+	if !strings.Contains(oAE, "gzip") &&
 		(oCE == "gzip" || oCE == "deflate" || oCE == "br") {
-		resp.Header.Del("Content-Encoding")
+		//resp.Header.Del("Content-Encoding")
 		oCE = ""
 	}
 
@@ -415,13 +415,13 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		IsTextContentType(resp.Header.Get("Content-Type")) {
 		content := reflect.ValueOf(resp.Body).Elem().FieldByName("content").Bytes()
 		switch {
-		case strings.Contains(oAE, "gzip") && IsBinary(content):
+		/*case strings.Contains(oAE, "gzip") && IsBinary(content):
 			// urlfetch will remove "Content-Encoding: deflate" when "Accept-Encoding" contains "gzip"
 			ext := filepath.Ext(req.URL.Path)
 			if ext == "" || IsTextContentType(mime.TypeByExtension(ext)) {
 				// ignore wrong "Content-Type"
 				resp.Header.Set("Content-Encoding", "deflate")
-			}
+			}*/
 		case len(content) > 512:
 			// we got plain text here, try compress it
 			var bb bytes.Buffer
@@ -429,9 +429,9 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			var ce string
 
 			switch {
-			case r.Header.Get("User-Agent") == "Mozilla/5.0":
+			//case r.Header.Get("User-Agent") == "Mozilla/5.0":
 				// let App Engine automatically compress it
-				chunked = true
+				//chunked = true
 			case strings.Contains(oAE, "deflate"):
 				w, err = flate.NewWriter(&bb, flate.BestCompression)
 				ce = "deflate"
@@ -458,7 +458,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-	}*/
+	}
 
 	if debug > 1 {
 		//c.Infof("Write Response=%#v, chunked=%#v\n", resp, chunked)
