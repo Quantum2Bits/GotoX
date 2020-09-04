@@ -316,7 +316,7 @@ func handler(rw http.ResponseWriter, r *http.Request) {
                        //IdleConnTimeout:       30 * time.Second,
                        TLSHandshakeTimeout:   10 * time.Second,
                        ExpectContinueTimeout: 3 * time.Second,
-		       //DisableCompression:    true,
+		       DisableCompression:    true,
 		       //TLSNextProto:          xzero,
 	        }
 		clt := &http.Client{
