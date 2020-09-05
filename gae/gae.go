@@ -143,15 +143,6 @@ func ReadRequest(r io.Reader) (req *http.Request, err error) {
 	return
 }
 
-/*func fmtError(c appengine.Context, err error) string {
-	return fmt.Sprintf(`{
-    "type": "appengine(%s, %s/%s)",
-    "host": "%s",
-    "software": "%s",
-    "error": "%s"
-}
-`, runtime.Version(), runtime.GOOS, runtime.GOARCH, appengine.DefaultVersionHostname(c), appengine.ServerSoftware(), err.Error())
-}*/
 func fmtError(err error) string {
 	//pjid := os.Getenv("GCP_PROJECT")
 	//pjid := os.Getenv("GAE_APPLICATION")
@@ -189,7 +180,6 @@ func handlerError(rw http.ResponseWriter, err error, code int) {
 
 func handler(rw http.ResponseWriter, r *http.Request) {
 	var err error
-	//c := appengine.NewContext(r)
 	//c := r.Context()
 
 	var hdrLen uint16
@@ -204,7 +194,6 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 	req, err := ReadRequest(bufio.NewReader(flate.NewReader(&io.LimitedReader{R: r.Body, N: int64(hdrLen)})))
 	if err != nil {
 		//c.Criticalf("http.ReadRequest(%#v) return %#v", r.Body, err)
-		//log.Printf("http.ReadRequest(%#v) return %#v", r.Body, err)
 		fmt.Fprintf(os.Stderr,"http.ReadRequest(%#v) return %#v", r.Body, err)
 		handlerError(rw, err, http.StatusBadRequest)
 		return
@@ -239,7 +228,6 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 
 	if debug > 1 {
 		//c.Infof("Parsed Request=%#v\n", req)
-		//log.Printf("Parsed Request=%#v\n", req)
 		fmt.Fprintf(os.Stderr,"Parsed Request=%#v\n", req)
 	}
 
@@ -275,11 +263,6 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		         NetDialer: netdial,
 			 Config:    tlsconf,
 		    }*/
-	//xzero := map[string]func(string,*tls.Conn) http.RoundTripper{}
-        //ctx, cancel := context.WithTimeout(c, deadline)
-	//defer cancel()
-	//req = req.Clone(c)
-	//req = req.WithContext(ctx)
 	for i := 0; i < 1; i++ { //loop
 	   netdial := &net.Dialer{
                      Timeout:   30 * time.Second,
@@ -328,7 +311,6 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		//resp, err = t.RoundTrip(req)
 		req.RequestURI = ""
 		resp, err = clt.Do(req)
-		//resp, err = t.RoundTrip(req.Clone(c))
 		if resp != nil && resp.Body != nil {
 			if v := reflect.ValueOf(resp.Body).Elem().FieldByName("truncated"); v.IsValid() {
 				if truncated := v.Bool(); truncated {
@@ -347,7 +329,6 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 		break  //---------------????
 		if strings.Contains(message, "RESPONSE_TOO_LARGE") {
 			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			fmt.Fprintf(os.Stderr,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			if s := req.Header.Get("Range"); s != "" {
 				if parts1 := strings.Split(s, "="); len(parts1) == 2 {
@@ -371,7 +352,6 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			}
 		} else if strings.Contains(message, "Over quota") {
 			//c.Warningf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			fmt.Fprintf(os.Stderr,"URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			time.Sleep(DefaultOverquotaDelay)
 		} else if strings.Contains(message, "urlfetch: CLOSED") {
@@ -380,7 +360,6 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 			time.Sleep(DefaultURLFetchClosedDelay)
 		} else {
 			//c.Errorf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
-			//log.Printf("URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			fmt.Fprintf(os.Stderr," Unknown URLFetchServiceError %T(%v) deadline=%v, url=%v", err, err, deadline, req.URL.String())
 			break
 		}
@@ -462,13 +441,11 @@ func handler(rw http.ResponseWriter, r *http.Request) {
 
 	if debug > 1 {
 		//c.Infof("Write Response=%#v, chunked=%#v\n", resp, chunked)
-		//log.Printf("Write Response=%#v, chunked=%#v\n", resp, chunked)
 		fmt.Fprintf(os.Stderr,"Write Response=%#v, chunked=%#v\n", resp, chunked)
 	}
 
 	if debug > 0 {
 		//c.Infof("%s \"%s %s %s\" %d %s", resp.Request.RemoteAddr, resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto, resp.StatusCode, resp.Header.Get("Content-Length"))
-		//log.Printf("%s \"%s %s %s\" %d %s", resp.Request.RemoteAddr, resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto, resp.StatusCode, resp.Header.Get("Content-Length"))
 		fmt.Fprintf(os.Stderr,"%s \"%s %s %s\" %d %s", resp.Request.RemoteAddr, resp.Request.Method, resp.Request.URL.String(), resp.Request.Proto, resp.StatusCode, resp.Header.Get("Content-Length"))
 	}
 
@@ -508,58 +485,17 @@ func robots(rw http.ResponseWriter, r *http.Request) {
 	io.WriteString(rw, "User-agent: *\nDisallow: /\n")
 }
 
-/*func root(rw http.ResponseWriter, r *http.Request) {
-	c := appengine.NewContext(r)
-
-	version, _ := strconv.ParseInt(strings.Split(appengine.VersionID(c), ".")[1], 10, 64)
-	ctime := time.Unix(version/(1<<28), 0).Format(time.RFC3339)
-
-	var latest string
-	t := &urlfetch.Transport{Context: c}
-	req, _ := http.NewRequest("GET", "https://github.com/SeaHOH/GotoX/commits/gaeserver.goproxy/gae", nil)
-	resp, err := t.RoundTrip(req)
-	if err != nil {
-		latest = err.Error()
-	} else {
-		data, err := ioutil.ReadAll(resp.Body)
-		if err != nil {
-			latest = err.Error()
-		} else {
-			latest = regexp.MustCompile(`\d\d\d\d-\d\d-\d\dT\d\d:\d\d:\d\dZ`).FindString(string(data))
-		}
-	}
-
-	rw.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	var message string
-	switch {
-	case latest == "":
-		message = "unable check goproxy latest version, please try after 5 minutes."
-	case latest <= ctime:
-		message = "already update to latest."
-	default:
-		message = "please update this server"
-	}
-	fmt.Fprintf(rw, `{
-	"server": "goproxy %s (%s, %s/%s)"
-	"latest": "%s",
-	"deploy": "%s",
-	"message": "%s"
-}
-`, Version, runtime.Version(), runtime.GOOS, runtime.GOARCH, latest, ctime, message)
-}*/
 func root(rw http.ResponseWriter, r *http.Request) {
-	//c := appengine.NewContext(r)
 	//c :=r.Context()
 
 	//version, _ := strconv.ParseInt(strings.Split(appengine.VersionID(c), ".")[1], 10, 64)
 	//ctime := time.Unix(version/(1<<28), 0).Format(time.RFC3339)
-	var version int64 = ((2020-1970)*365+6*30+18)*24*60*60
+	var version int64 = ((2020-1970)*365+8*30+18)*24*60*60
 	ctime := time.Unix(version, 0).Format(time.RFC3339)
 
 	var latest string
 	//t := &urlfetch.Transport{Context: c}
 	t := &http.Transport{}; //???
-	//var t http.Transport; //???
 	req, _ := http.NewRequest("GET", "https://github.com/SeaHOH/GotoX/commits/gaeserver.goproxy/gae", nil)
 	resp, err := t.RoundTrip(req)
 	if err != nil {
@@ -610,12 +546,6 @@ func root(rw http.ResponseWriter, r *http.Request) {
    }
 }
 
-/*func init() {
-	http.HandleFunc("/_gh/", handler)
-	http.HandleFunc("/favicon.ico", favicon)
-	http.HandleFunc("/robots.txt", robots)
-	http.HandleFunc("/", root)
-}*/
 func main(){
 	//os.Setenv("GODEBUG","http2client=0")
 	http.HandleFunc("/_gh/", handler)
@@ -676,13 +606,4 @@ func main(){
 	/*if err := http.ListenAndServe(host+":"+port, http.HandlerFunc(handleHTTP)); err != nil {
 		log.Fatalf("http.ListenAndServe: %v", err)
 	}*/
-        /*s := &http.Server{
-           Addr:           host+":"+port,
-	   Handler:        nil,
-	   ReadTimeout:    10 * time.Second,
-	   WriteTimeout:   10 * time.Second,
-	   MaxHeaderBytes: 1 << 20,
-       }
-       log.Fatal(s.ListenAndServe())*/
-       //log.Print(s.ListenAndServe())
 }
